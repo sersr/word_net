@@ -1,9 +1,11 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_nop/flutter_nop.dart';
 import 'package:hive/hive.dart';
 import 'package:word_net/modules/home/providers/state.dart';
+import 'package:word_net/modules/home/providers/text_parser.dart';
 import 'package:word_net/modules/utils/equatable.dart';
 
 class HomeProvider with NopLifecycle {
@@ -43,6 +45,7 @@ class HomeProvider with NopLifecycle {
     } else {
       _boxNotifier.value = box;
       _boxFileNotifier.value = fileBox;
+      state.currentSelected.addListener(_renderText);
     }
   }
 
@@ -71,24 +74,12 @@ class HomeProvider with NopLifecycle {
     return value.get('indexs', defaultValue: const []);
   }
 
-  bool get currentIsFile => isFile(state.currentSelected.value);
-
   bool isFile(String item) {
     final value = _boxFileNotifier.value;
     if (value == null) return true;
 
     return value.get(item) != null;
   }
-
-  bool get currentIsDir {
-    final value = _boxNotifier.value;
-    if (value == null) return true;
-    return value.get(state.currentSelected.value) != null;
-  }
-
-  List<String> get currentItem => getItems(state.currentSelected.value);
-
-  String get currentString => getData(state.currentSelected.value);
 
   List<String> getItems(String item) {
     final value = _boxNotifier.value;
@@ -104,6 +95,19 @@ class HomeProvider with NopLifecycle {
 
   void onPressed(String current) {
     state.currentSelected.value = current;
+  }
+
+  String get currentString => getData(state.currentSelected.value);
+
+  late final _parser = TextParser(getData: getData, onTap: onPressed);
+  void _renderText() {
+    final currentData = currentString;
+    if (currentData.isEmpty) {
+      state.bodyTextSpan.value = const TextSpan();
+      return;
+    }
+
+    state.bodyTextSpan.value = _parser.parseStyle(currentData);
   }
 
   void updatePath(List<String> newPath) {
