@@ -26,7 +26,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('基础汉英类意词典'),
+        title: const Text('基础汉英类义词典'),
       ),
       body: Cs(() {
         final indexs = provider.indexs;
