@@ -190,6 +190,7 @@ class TextParser {
                       horizontal: 12.0, vertical: 16.0),
                   child: Text.rich(span),
                 );
+                content = SelectionArea(child: content!);
 
                 content = Material(
                   elevation: 8,

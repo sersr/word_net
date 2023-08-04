@@ -103,10 +103,13 @@ class _Body extends StatelessWidget {
       final span = controller.state.bodyTextSpan.value;
 
       final data = controller.currentString;
-      return SingleChildScrollView(
+
+      final child = SingleChildScrollView(
           key: ValueKey(data),
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
           child: Text.rich(span));
+
+      return SelectionArea(child: child);
     });
   }
 }
