@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_nop/flutter_nop.dart';
 import 'package:hive/hive.dart';
@@ -93,13 +94,56 @@ class HomeProvider with NopLifecycle {
     return value.get(item, defaultValue: '');
   }
 
+  bool ignore = false;
   void onPressed(String current) {
+    ignore = true;
     state.currentSelected.value = current;
+    SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+      ignore = false;
+    });
+  }
+
+  void jump(String item) {
+    ignore = false;
+    state.currentSelected.value = item;
+    final localIndex = indexs;
+
+    List<String> loop(List<String> path, List<String> items) {
+      for (var dirOrFile in items) {
+        final newPath = [...path, dirOrFile];
+        final childItems = getItems(newPath.join());
+        if (childItems.isNotEmpty) {
+          final list = loop(newPath, childItems);
+          if (list.isNotEmpty) {
+            return list;
+          }
+          continue;
+        }
+
+        if (dirOrFile == item) {
+          return path;
+        }
+      }
+      return const [];
+    }
+
+    var newPaths = const <String>[];
+
+    for (var index in localIndex) {
+      newPaths = loop([index], getItems(index));
+      if (newPaths.isNotEmpty) {
+        break;
+      }
+    }
+
+    updatePath(newPaths);
+
+    state.updatePaths();
   }
 
   String get currentString => getData(state.currentSelected.value);
 
-  late final parser = TextParser(getData: getData, onTap: onPressed);
+  late final parser = TextParser(getData: getData, onTap: jump);
   void _renderText() {
     final currentData = currentString;
     if (currentData.isEmpty) {
@@ -108,6 +152,18 @@ class HomeProvider with NopLifecycle {
     }
 
     state.bodyTextSpan.value = parser.parseStyle(currentData);
+  }
+
+  bool inSelectedTree(List<String> part) {
+    final list = state.currentPath.value.value;
+    if (part.length > list.length) return false;
+    for (var i = 0; i < list.length; i++) {
+      if (i >= part.length) break;
+
+      if (list[i] != part[i]) return false;
+    }
+
+    return true;
   }
 
   void updatePath(List<String> newPath) {

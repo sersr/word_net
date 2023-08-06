@@ -1,4 +1,7 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_nop/change_notifier.dart';
 import 'package:flutter_nop/router.dart';
 import 'package:nop/utils.dart';
@@ -32,14 +35,21 @@ class _HomePageState extends State<HomePage> {
         final indexs = provider.indexs;
 
         if (indexs.isEmpty) return const SizedBox();
-        final left = ListView.builder(
-          itemBuilder: (context, index) {
-            final item = indexs[index];
 
-            return Dir(currentPath: item, title: item);
-          },
-          itemCount: indexs.length,
+        final left = CustomScrollView(
+          slivers: [
+            for (var index in indexs)
+              SliverToBoxAdapter(child: Dir(title: index)),
+          ],
         );
+        // final left = ListView.builder(
+        //   itemBuilder: (context, index) {
+        //     final item = indexs[index];
+
+        //     return Dir(title: item);
+        //   },
+        //   itemCount: indexs.length,
+        // );
 
         Widget divider = Cs(() {
           return MouseRegion(
@@ -148,13 +158,21 @@ class _BodyState extends State<_Body> {
 }
 
 class Dir extends StatefulWidget {
-  const Dir({
+  Dir({
     super.key,
-    required this.currentPath,
     required this.title,
+  }) : paths = [title];
+
+  const Dir._paths({
+    required this.title,
+    required this.paths,
   });
-  final String currentPath;
+
   final String title;
+  final List<String> paths;
+
+  String get currentPath => paths.join('');
+
   @override
   State<Dir> createState() => _DirState();
 }
@@ -177,24 +195,46 @@ class _DirState extends State<Dir> with SingleTickerProviderStateMixin {
   void didChangeDependencies() {
     super.didChangeDependencies();
     homeProvider = context.grass();
-    display = homeProvider.state.getDisplay(widget.currentPath);
-    if (!animationController.isAnimating && display.value) {
-      animationController.value = 1.0;
+    _updateDisplay();
+  }
+
+  bool _init = false;
+  void _updateDisplay() {
+    final newDisplay = homeProvider.state.getDisplay(widget.currentPath);
+    if (!_init) {
+      _init = true;
+      newDisplay.addListener(_listener);
+      display = newDisplay;
+      _listener();
+      return;
+    }
+    if (display != newDisplay) {
+      display.removeListener(_listener);
+      newDisplay.addListener(_listener);
+      display = newDisplay;
+      _listener();
+    }
+  }
+
+  void _listener() {
+    if (!animationController.isAnimating) {
+      animationController.value = display.value ? 1.0 : 0.0;
     }
   }
 
   @override
   void didUpdateWidget(covariant Dir oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.currentPath != oldWidget.currentPath) {
+    if (!const DeepCollectionEquality().equals(widget.paths, oldWidget.paths)) {
       homeProvider.state.remove(oldWidget.currentPath);
-      display = homeProvider.state.getDisplay(widget.currentPath);
+      _updateDisplay();
     }
   }
 
   @override
   void dispose() {
     animationController.dispose();
+    display.removeListener(_listener);
     super.dispose();
   }
 
@@ -210,7 +250,8 @@ class _DirState extends State<Dir> with SingleTickerProviderStateMixin {
     const displayStyle = TextStyle(color: Colors.blue, fontSize: 14.0);
     return Cs(() {
       final items = homeProvider.getItems(widget.currentPath);
-      final style = display.value ? displayStyle : null;
+      final style =
+          homeProvider.inSelectedTree(widget.paths) ? displayStyle : null;
       Widget top = BaseButton(
         child: Padding(
           padding: const EdgeInsets.all(8.0),
@@ -233,35 +274,29 @@ class _DirState extends State<Dir> with SingleTickerProviderStateMixin {
         return top;
       }
 
+      Widget itemBuilder(BuildContext context, int index) {
+        final item = items[index];
+
+        if (homeProvider.isFile(item)) {
+          return IndexItem(
+            item: item,
+            style: style,
+            paths: widget.paths,
+          );
+        }
+
+        return Dir._paths(
+          title: item,
+          paths: [...widget.paths, item],
+        );
+      }
+
       Widget body = Padding(
         padding: const EdgeInsets.only(left: 16),
         child: ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemBuilder: (context, index) {
-            final item = items[index];
-
-            if (homeProvider.isFile(item)) {
-              return Cs(() {
-                TextStyle? style;
-                if (homeProvider.isCurrentSelected(item)) {
-                  style = displayStyle;
-                }
-
-                return BaseButton(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(item, style: style),
-                  ),
-                  onTap: () {
-                    homeProvider.onPressed(item);
-                  },
-                );
-              });
-            }
-
-            return Dir(currentPath: '${widget.currentPath}$item', title: item);
-          },
+          itemBuilder: itemBuilder,
           itemCount: items.length,
         ),
       );
@@ -276,6 +311,89 @@ class _DirState extends State<Dir> with SingleTickerProviderStateMixin {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [top, body],
+      );
+    });
+  }
+}
+
+class IndexItem extends StatefulWidget {
+  const IndexItem({
+    super.key,
+    required this.item,
+    required this.style,
+    required this.paths,
+  });
+
+  final String item;
+  final TextStyle? style;
+  final List<String> paths;
+
+  @override
+  State<IndexItem> createState() => _IndexItemState();
+}
+
+class _IndexItemState extends State<IndexItem> {
+  late HomeProvider homeProvider;
+  late AutoListenNotifier<String> currentSelected;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    homeProvider = context.grass();
+    _update();
+  }
+
+  bool _init = false;
+  void _update() {
+    final newCurrent = homeProvider.state.currentSelected;
+    if (!_init) {
+      _init = true;
+      newCurrent.addListener(_listener);
+      currentSelected = newCurrent;
+      _listener();
+      return;
+    }
+
+    if (newCurrent != currentSelected) {
+      currentSelected.removeListener(_listener);
+      newCurrent.addListener(_listener);
+      currentSelected = newCurrent;
+    }
+  }
+
+  void _listener() {
+    if (homeProvider.isCurrentSelected(widget.item) && !homeProvider.ignore) {
+      SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+        if (!mounted || !homeProvider.isCurrentSelected(widget.item)) return;
+        final renderObject = context.findRenderObject();
+        RenderAbstractViewport.maybeOf(renderObject)
+            ?.showOnScreen(descendant: renderObject);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    currentSelected.removeListener(_listener);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Cs(() {
+      var style = widget.style;
+      if (!homeProvider.isCurrentSelected(widget.item)) {
+        style = null;
+      }
+      return BaseButton(
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Text(widget.item, style: style),
+        ),
+        onTap: () {
+          homeProvider.onPressed(widget.item);
+          homeProvider.updatePath(widget.paths);
+        },
       );
     });
   }

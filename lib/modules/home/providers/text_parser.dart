@@ -163,11 +163,12 @@ class TextParser {
               return;
             }
 
-            if (current != delegate) return;
             current?.hide().whenComplete(() {
               if (hover) return;
               if (current.closed || current.showStatus) return;
-              delegate = null;
+              if (current == delegate) {
+                delegate = null;
+              }
               current.close();
             });
           });

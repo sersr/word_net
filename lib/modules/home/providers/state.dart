@@ -21,5 +21,17 @@ class HomeState {
     _dirDisplays.clear();
   }
 
+  void updatePaths() {
+    final paths = currentPath.value.value;
+    int count = 0;
+    while (count <= paths.length) {
+      final path = paths.sublist(0, count).join('');
+      final notifier = getDisplay(path);
+
+      notifier.value = true;
+      count++;
+    }
+  }
+
   final bodyTextSpan = const TextSpan().cs;
 }
