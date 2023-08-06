@@ -93,18 +93,51 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _Body extends StatelessWidget {
+class _Body extends StatefulWidget {
   const _Body();
+
+  @override
+  State<_Body> createState() => _BodyState();
+}
+
+class _BodyState extends State<_Body> {
+  final scrollController = ScrollController();
+  late HomeProvider controller;
+
+  bool _enabled() {
+    assert(mounted);
+
+    if (scrollController.hasClients) {
+      final position = scrollController.position;
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      return position.activity!.velocity == 0;
+    }
+
+    return true;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    controller = context.grass();
+    controller.parser.showEnabledFn = _enabled;
+  }
+
+  @override
+  void dispose() {
+    controller.parser.showEnabledFn = null;
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final controller = context.grass<HomeProvider>();
-
     return Cs(() {
       final span = controller.state.bodyTextSpan.value;
 
       final data = controller.currentString;
 
       final child = SingleChildScrollView(
+          controller: scrollController,
           key: ValueKey(data),
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
           child: Text.rich(span));

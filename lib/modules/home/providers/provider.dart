@@ -99,7 +99,7 @@ class HomeProvider with NopLifecycle {
 
   String get currentString => getData(state.currentSelected.value);
 
-  late final _parser = TextParser(getData: getData, onTap: onPressed);
+  late final parser = TextParser(getData: getData, onTap: onPressed);
   void _renderText() {
     final currentData = currentString;
     if (currentData.isEmpty) {
@@ -107,7 +107,7 @@ class HomeProvider with NopLifecycle {
       return;
     }
 
-    state.bodyTextSpan.value = _parser.parseStyle(currentData);
+    state.bodyTextSpan.value = parser.parseStyle(currentData);
   }
 
   void updatePath(List<String> newPath) {

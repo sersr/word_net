@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_nop/flutter_nop.dart';
 
 import '../../../_router/routes.dart';
@@ -15,6 +16,8 @@ class TextParser {
   void Function(String item)? onTap;
 
   static final none = TextParser._();
+
+  bool Function()? showEnabledFn;
 
   static final _reg =
       RegExp('(<.*?>)(.*?)</font>', multiLine: true, dotAll: true);
@@ -131,16 +134,18 @@ class TextParser {
 
         OverlayMixinDelegate? currentDelegate;
 
-        bool enter = false;
+        bool hover = false;
 
         void cancel() {
           cancelTimer?.cancel();
-          enter = true;
+          hover = true;
+          currentDelegate?.show();
         }
 
+        bool enter = false;
         void onExit() {
           cancelTimer?.cancel();
-
+          enter = false;
           if (currentDelegate?.active == false) {
             currentDelegate!.close();
             currentDelegate = null;
@@ -148,8 +153,9 @@ class TextParser {
             return;
           }
 
-          cancelTimer = Timer(const Duration(milliseconds: 600), () {
-            if (enter) return;
+          cancelTimer = Timer(const Duration(milliseconds: 400), () {
+            if (hover) return;
+
             final current = currentDelegate;
 
             if (current?.closed == true) {
@@ -158,83 +164,110 @@ class TextParser {
             }
 
             if (current != delegate) return;
-            delegate = null;
             current?.hide().whenComplete(() {
+              if (hover) return;
+              if (current.closed || current.showStatus) return;
+              delegate = null;
               current.close();
             });
           });
         }
 
-        final textSpan = TextSpan(
-            text: value,
-            style: style,
-            mouseCursor: SystemMouseCursors.click,
-            onEnter: (p) {
-              if (content == null) {
-                final data = getData!(value);
-                if (data.isEmpty) return;
+        void onEnter(PointerEnterEvent event) {
+          if (content == null) {
+            final data = getData!(value);
+            if (data.isEmpty) return;
 
-                final span = none.parseStyle(data);
-                final jump = onTap;
-                if (jump != null) {
-                  none.onTap = (value) {
-                    jump(value);
-                    delegate?.close();
-                    delegate = null;
-                  };
-                }
-
-                content = SingleChildScrollView(
-                  key: ValueKey(data),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12.0, vertical: 16.0),
-                  child: Text.rich(span),
-                );
-                content = SelectionArea(child: content!);
-
-                content = Material(
-                  elevation: 8,
-                  borderRadius: BorderRadius.circular(8),
-                  child: content,
-                );
-              }
-              cancelTimer?.cancel();
-
-              if (currentDelegate == null || currentDelegate?.closed == true) {
-                final local =
-                    currentDelegate = getDelegate(content!, p.position);
-
-                content = MouseRegion(
-                  onEnter: (p) {
-                    if (identical(local, currentDelegate)) return;
-                    cancel();
-                  },
-                  onExit: (_) {
-                    if (identical(local, currentDelegate)) return;
-                    enter = false;
-                    onExit();
-                  },
-                  child: content,
-                );
-              }
-
-              currentDelegate!.show();
-              if (delegate != null && delegate != currentDelegate) {
-                delegate!.close();
+            final span = none.parseStyle(data);
+            final jump = onTap;
+            if (jump != null) {
+              none.onTap = (value) {
+                jump(value);
+                delegate?.close();
                 delegate = null;
+              };
+            }
+
+            content = SingleChildScrollView(
+              key: ValueKey(data),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
+              child: Text.rich(span),
+            );
+            content = SelectionArea(child: content!);
+
+            content = Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(8),
+              child: content,
+            );
+
+            content = MouseRegion(
+              onEnter: (p) {
+                cancel();
+              },
+              onExit: (_) {
+                hover = false;
+                onExit();
+              },
+              child: content,
+            );
+          }
+
+          cancelTimer?.cancel();
+
+          if (currentDelegate == null || currentDelegate?.closed == true) {
+            currentDelegate = getDelegate(content!, event.position);
+          }
+
+          if (delegate != null && delegate != currentDelegate) {
+            delegate!.close();
+          }
+
+          currentDelegate!.show();
+          delegate = currentDelegate;
+        }
+
+        bool scheduled = false;
+
+        bool ignore = false;
+        void loopEnter(PointerEnterEvent event) {
+          final enabled = showEnabledFn?.call() ?? true;
+
+          enter = true;
+          if (!enabled) {
+            ignore = false;
+            if (scheduled) return;
+
+            SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+              if (!enter) return;
+              scheduled = false;
+              if (ignore) return;
+              loopEnter(event);
+            });
+            scheduled = true;
+            return;
+          }
+          ignore = true;
+          onEnter(event);
+        }
+
+        final textSpan = TextSpan(
+          text: value,
+          style: style,
+          mouseCursor: SystemMouseCursors.click,
+          onEnter: loopEnter,
+          onExit: (p) => onExit(),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () {
+              if (onTap != null) {
+                currentDelegate?.close();
+                currentDelegate = null;
+                delegate = null;
+                onTap!(value);
               }
-              delegate = currentDelegate;
             },
-            onExit: (p) => onExit(),
-            recognizer: TapGestureRecognizer()
-              ..onTap = () {
-                if (onTap != null) {
-                  currentDelegate?.close();
-                  currentDelegate = null;
-                  delegate = null;
-                  onTap!(value);
-                }
-              });
+        );
 
         children.add(textSpan);
       }
@@ -275,23 +308,23 @@ class TextParser {
         var left = dx - 8;
         Alignment alignment = Alignment.topLeft;
 
-        final alignRight = dx >= size.width / 2;
-        final alignBottom = dy >= size.height * 2 / 3;
-        if (alignRight) {
-          left = 20;
+        final closedRight = dx >= size.width / 2;
+        final closedBottom = dy >= size.height * 2 / 3;
+        if (closedRight) {
+          left = 8;
           alignment = Alignment.topRight;
-          right = size.width - dx;
+          right = size.width - dx + 5;
         }
-        var top = dy - 8;
+        var top = dy;
         var bottom = 20.0;
-        if (alignBottom) {
-          if (alignRight) {
+        if (closedBottom) {
+          if (closedRight) {
             alignment = Alignment.bottomRight;
           } else {
             alignment = Alignment.bottomLeft;
           }
 
-          bottom = size.height - dy;
+          bottom = size.height - dy + 5;
           top = 20;
         }
 
@@ -315,7 +348,7 @@ class TextParser {
     ]);
 
     final delegate = OverlayMixinDelegate(
-        pannels, const Duration(milliseconds: 300),
+        pannels, const Duration(milliseconds: 220),
         delayDuration: const Duration(milliseconds: 300));
 
     delegate.overlay = OverlayObserverState(overlayGetter: () {
