@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_nop/flutter_nop.dart';
 
@@ -15,6 +16,8 @@ class TextParser {
 
   void Function(String item)? onTap;
 
+  RenderParagraph? Function()? getText;
+
   static final none = TextParser._();
 
   bool Function()? showEnabledFn;
@@ -25,11 +28,34 @@ class TextParser {
   static final _regBold =
       RegExp('\\*\\*(.*)\\*\\*', multiLine: true, dotAll: true);
 
+  static int getTextSpanLength(TextSpan span) {
+    var length = 0;
+    if (span.text?.isNotEmpty == true) {
+      length += span.text!.length;
+    }
+    if (span.children?.isNotEmpty == true) {
+      for (var child in span.children!) {
+        if (child is TextSpan) {
+          length += getTextSpanLength(child);
+        }
+      }
+    }
+    return length;
+  }
+
   TextSpan parseStyle(String text) {
+    return runZoned(() {
+      return _parseStyle(text);
+    }, zoneValues: {'fullText': text});
+  }
+
+  TextSpan _parseStyle(String text) {
     final matchs = _reg.allMatches(text);
     final spans = <TextSpan>[];
 
     var start = 0;
+
+    var textStart = 0;
 
     for (var match in matchs) {
       final value = match[1]!;
@@ -37,7 +63,9 @@ class TextParser {
 
       if (start < match.start) {
         final current = text.substring(start, match.start);
-        spans.add(_parseLink(current, null));
+        final span = _parseLink(textStart, current, null);
+        textStart += getTextSpanLength(span);
+        spans.add(span);
       }
 
       final color = switch (value) {
@@ -49,22 +77,24 @@ class TextParser {
       };
 
       final current = match[2]!;
-
-      spans.add(_parseBold(color, current));
-
+      final span = _parseBold(textStart, color, current);
+      textStart += getTextSpanLength(span);
+      spans.add(span);
       start = end;
     }
     if (start < text.length) {
       final current = text.substring(start);
-      spans.add(_parseLink(current, null));
+      final span = _parseLink(textStart, current, null);
+      textStart += getTextSpanLength(span);
+      spans.add(span);
     }
     return TextSpan(children: spans);
   }
 
-  TextSpan _parseBold(Color? color, String text) {
+  TextSpan _parseBold(int textStart, Color? color, String text) {
     final bolds = _regBold.allMatches(text);
     if (bolds.isEmpty) {
-      return _parseLink(text, TextStyle(color: color));
+      return _parseLink(textStart, text, TextStyle(color: color));
     } else {
       final children = <TextSpan>[];
       var start = 0;
@@ -75,15 +105,21 @@ class TextParser {
 
         if (start < match.start) {
           final current = text.substring(start, match.start);
-          children.add(_parseLink(current, null));
+          final span = _parseLink(textStart, current, null);
+          textStart += getTextSpanLength(span);
+          children.add(span);
         }
-        children.add(_parseLink(value, style));
+        final span = _parseLink(textStart, value, style);
+        textStart += getTextSpanLength(span);
+        children.add(span);
         start = end;
       }
 
       if (start < text.length) {
         final current = text.substring(start);
-        children.add(_parseLink(current, null));
+        final span = _parseLink(textStart, current, null);
+        textStart += getTextSpanLength(span);
+        children.add(span);
       }
       return TextSpan(children: children);
     }
@@ -94,8 +130,9 @@ class TextParser {
 
   OverlayMixinDelegate? delegate;
 
-  TextSpan _parseLink(String text, TextStyle? style) {
+  TextSpan _parseLink(int textStart, String text, TextStyle? style) {
     final matchs = _regLink.allMatches(text);
+
     if (matchs.isEmpty) return TextSpan(text: text, style: style);
     final children = <TextSpan>[];
 
@@ -112,9 +149,12 @@ class TextParser {
         if (current.startsWith('\n')) {
           current = ' $current';
         }
+        textStart += current.length;
         children.add(TextSpan(text: current));
       }
+      final localStart = textStart;
 
+      textStart += value.length;
       if (getData == null) {
         children.add(
           TextSpan(
@@ -146,10 +186,10 @@ class TextParser {
         void onExit() {
           cancelTimer?.cancel();
           enter = false;
-          if (currentDelegate?.active == false) {
+          if (currentDelegate?.active == false ||
+              currentDelegate?.duringDelay == true) {
             currentDelegate!.close();
             currentDelegate = null;
-            delegate = null;
             return;
           }
 
@@ -166,9 +206,6 @@ class TextParser {
             current?.hide().whenComplete(() {
               if (hover) return;
               if (current.closed || current.showStatus) return;
-              if (current == delegate) {
-                delegate = null;
-              }
               current.close();
             });
           });
@@ -218,7 +255,33 @@ class TextParser {
           cancelTimer?.cancel();
 
           if (currentDelegate == null || currentDelegate?.closed == true) {
-            currentDelegate = getDelegate(content!, event.position);
+            final text = getText?.call();
+            var offset = event.position;
+            var height = 0.0;
+            var width = 0.0;
+            if (text != null) {
+              final textPosition = TextPosition(offset: localStart);
+
+              final textPositionEnd =
+                  TextPosition(offset: localStart + value.length);
+
+              final textOffset =
+                  text.getOffsetForCaret(textPosition, Rect.zero);
+              height = text.getFullHeightForCaret(textPosition) ?? 0;
+
+              final endOffset =
+                  text.getOffsetForCaret(textPositionEnd, Rect.zero);
+
+              if (endOffset.dx < textOffset.dx) {
+                width = text.size.width - textOffset.dx;
+              } else {
+                width = endOffset.dx - textOffset.dx;
+              }
+
+              offset = text.localToGlobal(textOffset);
+            }
+
+            currentDelegate = getDelegate(content!, offset, height, width);
           }
 
           if (delegate != null && delegate != currentDelegate) {
@@ -287,7 +350,7 @@ class TextParser {
   }
 
   OverlayMixinDelegate<OverlayMixin>? getDelegate(
-      Widget content, Offset position) {
+      Widget content, Offset position, double height, double width) {
     late final OverlayVerticalPannels pannels;
     pannels = OverlayVerticalPannels(builders: [
       (context) {
@@ -306,7 +369,7 @@ class TextParser {
         final dy = position.dy;
 
         var right = 20.0;
-        var left = dx - 8;
+        var left = dx;
         Alignment alignment = Alignment.topLeft;
 
         final closedRight = dx >= size.width / 2;
@@ -314,10 +377,10 @@ class TextParser {
         if (closedRight) {
           left = 8;
           alignment = Alignment.topRight;
-          right = size.width - dx + 5;
+          right = size.width - dx - width;
         }
-        var top = dy;
-        var bottom = 20.0;
+        var top = dy + height;
+        var bottom = 50.0;
         if (closedBottom) {
           if (closedRight) {
             alignment = Alignment.bottomRight;
@@ -325,7 +388,7 @@ class TextParser {
             alignment = Alignment.bottomLeft;
           }
 
-          bottom = size.height - dy + 5;
+          bottom = size.height - dy;
           top = 20;
         }
 

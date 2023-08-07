@@ -27,7 +27,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final child = Scaffold(
       appBar: AppBar(
         title: const Text('基础汉英类义词典'),
       ),
@@ -76,6 +76,19 @@ class _HomePageState extends State<HomePage> {
         );
       }),
     );
+
+    return child;
+    // return Stack(
+    //   children: [
+    //     child,
+    //     Positioned.fill(
+    //         child: IgnorePointer(
+    //       child: CustomPaint(
+    //         painter: ScreenLine(),
+    //       ),
+    //     ))
+    //   ],
+    // );
   }
 
   final barWidth = 200.0.cs;
@@ -131,11 +144,54 @@ class _BodyState extends State<_Body> {
     super.didChangeDependencies();
     controller = context.grass();
     controller.parser.showEnabledFn = _enabled;
+
+    controller.parser.getText = getText;
+
+    if (!_init) {
+      SchedulerBinding.instance.addPostFrameCallback((timeStamp) {
+        _init = true;
+      });
+    }
+  }
+
+  bool _init = false;
+
+  RenderParagraph? getText() {
+    if (!_init) return null;
+    if (!mounted) return null;
+    if (!scrollController.hasClients) {
+      return null;
+    }
+
+    final text = context.findRenderObject();
+    if (text is RenderParagraph) {
+      return text;
+    }
+
+    RenderParagraph? paragraph;
+
+    void vistor(BuildContext element) {
+      if (paragraph != null) return;
+      element.visitChildElements((element) {
+        if (paragraph != null) return;
+        final text = element.findRenderObject();
+        if (text is RenderParagraph) {
+          paragraph = text;
+          return;
+        }
+
+        vistor(element);
+      });
+    }
+
+    vistor(context);
+    return paragraph;
   }
 
   @override
   void dispose() {
     controller.parser.showEnabledFn = null;
+    controller.parser.getText = null;
     super.dispose();
   }
 
