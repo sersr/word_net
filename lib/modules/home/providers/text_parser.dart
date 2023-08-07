@@ -186,8 +186,7 @@ class TextParser {
         void onExit() {
           cancelTimer?.cancel();
           enter = false;
-          if (currentDelegate?.active == false ||
-              currentDelegate?.duringDelay == true) {
+          if (currentDelegate?.active == false) {
             currentDelegate!.close();
             currentDelegate = null;
             return;
