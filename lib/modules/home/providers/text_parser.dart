@@ -6,7 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_nop/flutter_nop.dart';
 
-import '../../../_router/routes.dart';
+import '../../utils/overlay_delegate.dart';
 
 class TextParser {
   TextParser({this.getData, required void Function(String item) this.onTap});
@@ -346,77 +346,5 @@ class TextParser {
       children.add(TextSpan(text: current));
     }
     return TextSpan(children: children);
-  }
-
-  OverlayMixinDelegate<OverlayMixin>? getDelegate(
-      Widget content, Offset position, double height, double width) {
-    late final OverlayVerticalPannels pannels;
-    pannels = OverlayVerticalPannels(builders: [
-      (context) {
-        final data = MediaQuery.of(context);
-        final size = data.size;
-
-        Widget child = GestureDetector(
-          onTap: () {},
-          child: FadeTransition(
-            opacity: pannels.controller,
-            child: content,
-          ),
-        );
-
-        var dx = position.dx;
-        final dy = position.dy;
-
-        var right = 20.0;
-        var left = dx;
-        Alignment alignment = Alignment.topLeft;
-
-        final closedRight = dx >= size.width / 2;
-        final closedBottom = dy >= size.height * 2 / 3;
-        if (closedRight) {
-          left = 8;
-          alignment = Alignment.topRight;
-          right = size.width - dx - width;
-        }
-        var top = dy + height;
-        var bottom = 50.0;
-        if (closedBottom) {
-          if (closedRight) {
-            alignment = Alignment.bottomRight;
-          } else {
-            alignment = Alignment.bottomLeft;
-          }
-
-          bottom = size.height - dy;
-          top = 20;
-        }
-
-        child = Container(
-          alignment: alignment,
-          child: child,
-        );
-        child = Positioned(
-          left: left,
-          top: top,
-          right: right,
-          bottom: bottom,
-          child: child,
-        );
-        // }
-
-        return Stack(
-          children: [child],
-        );
-      }
-    ]);
-
-    final delegate = OverlayMixinDelegate(
-        pannels, const Duration(milliseconds: 220),
-        delayDuration: const Duration(milliseconds: 300));
-
-    delegate.overlay = OverlayObserverState(overlayGetter: () {
-      return router.routerDelegate.navigatorKey.currentState?.overlay;
-    });
-    return delegate;
   }
 }

@@ -72,7 +72,7 @@ class HomeProvider with NopLifecycle {
   List<String> get indexs {
     final value = _boxNotifier.value;
     if (value == null) return const [];
-    return value.get('indexs', defaultValue: const []);
+    return value.get('indexs', defaultValue: const <String>[]);
   }
 
   bool isFile(String item) {
