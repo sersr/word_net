@@ -3,6 +3,7 @@ import 'package:flutter_nop/change_notifier.dart';
 import 'package:flutter_nop/router.dart';
 import 'package:nop/utils.dart';
 import 'package:word_net/modules/home/providers/provider.dart';
+import 'package:word_net/modules/home/widgets/search_widget.dart';
 
 import '../widgets/content_widget.dart';
 
@@ -24,57 +25,63 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final child = Scaffold(
-      appBar: AppBar(
-        title: const Text('基础汉英类义词典'),
-      ),
-      body: Cs(() {
-        final indexs = provider.indexs;
+    Widget child = Cs(() {
+      final indexs = provider.indexs;
 
-        if (indexs.isEmpty) return const SizedBox();
+      if (indexs.isEmpty) return const SizedBox();
 
-        final left = CustomScrollView(
-          slivers: [
-            for (var index in indexs)
-              SliverToBoxAdapter(child: Dir(title: index)),
-          ],
-        );
+      final left = CustomScrollView(
+        slivers: [
+          for (var index in indexs)
+            SliverToBoxAdapter(child: Dir(title: index)),
+        ],
+      );
 
-        final size = MediaQuery.of(context).size;
-        if (size.width < barWidth.value + 100) {
-          if (provider.currentString.isNotEmpty) {
-            return const ContentBody();
-          }
-          return left;
+      final size = MediaQuery.of(context).size;
+      if (size.width < barWidth.value + 100) {
+        if (provider.currentString.isNotEmpty) {
+          return const ContentBody();
         }
-        // final left = ListView.builder(
-        //   itemBuilder: (context, index) {
-        //     final item = indexs[index];
+        return left;
+      }
+      // final left = ListView.builder(
+      //   itemBuilder: (context, index) {
+      //     final item = indexs[index];
 
-        //     return Dir(title: item);
-        //   },
-        //   itemCount: indexs.length,
-        // );
+      //     return Dir(title: item);
+      //   },
+      //   itemCount: indexs.length,
+      // );
 
-        Widget divider = const MouseRegion(
-          cursor: SystemMouseCursors.resizeColumn,
-          child: VerticalDivider(width: 2, thickness: 2),
-        );
+      Widget divider = const MouseRegion(
+        cursor: SystemMouseCursors.resizeColumn,
+        child: VerticalDivider(width: 2, thickness: 2),
+      );
 
-        divider = GestureDetector(
-          onHorizontalDragUpdate: onUpdate,
-          child: divider,
-        );
+      divider = GestureDetector(
+        onHorizontalDragUpdate: onUpdate,
+        child: divider,
+      );
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Cs(() => SizedBox(width: barWidth.value, child: left)),
-            divider,
-            const Expanded(child: ContentBody()),
-          ],
-        );
-      }),
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Cs(() => SizedBox(width: barWidth.value, child: left)),
+          divider,
+          const Expanded(child: ContentBody()),
+        ],
+      );
+    });
+
+    child = Scaffold(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SearchWidget(),
+          const Divider(height: 1, thickness: 1),
+          Expanded(child: child),
+        ],
+      ),
     );
 
     return child;
@@ -97,9 +104,10 @@ class _HomePageState extends State<HomePage> {
 
   void onUpdate(DragUpdateDetails details) {
     final delta = details.primaryDelta ?? 0.0;
-    _rawOffset = _rawOffset + delta;
     final size = MediaQuery.of(context).size;
     final max = size.width - 100;
-    barWidth.value = _rawOffset.maxThan(100).minThan(max);
+    _rawOffset = _rawOffset + delta;
+    _rawOffset = _rawOffset.minThan(max);
+    barWidth.value = _rawOffset.maxThan(100);
   }
 }

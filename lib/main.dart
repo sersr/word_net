@@ -12,6 +12,8 @@ void main() async {
   router.put(() => HomeProvider());
 
   final app = MaterialApp.router(
+    title: '基础汉英类义词典',
+    debugShowCheckedModeBanner: false,
     routerConfig: router,
   );
 

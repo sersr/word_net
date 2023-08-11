@@ -110,7 +110,7 @@ class _ContentBodyState extends State<ContentBody> {
         child: Text.rich(key: _key, span),
       );
 
-      return SelectionArea(child: child);
+      return SizedBox.expand(child: SelectionArea(child: child));
     });
 
     final path = Cs(() {
@@ -153,16 +153,15 @@ class _ContentBodyState extends State<ContentBody> {
       );
 
       child = Container(
-        clipBehavior: Clip.hardEdge,
         decoration: const BoxDecoration(
           boxShadow: [
             BoxShadow(
               offset: Offset(0, 2),
-              color: Color.fromARGB(255, 200, 200, 200),
-              blurRadius: 5,
+              color: Color.fromARGB(255, 234, 234, 234),
+              blurRadius: 1,
             ),
           ],
-          color: Colors.white,
+          color: Color.fromARGB(255, 251, 251, 251),
         ),
         child: child,
       );
@@ -251,7 +250,25 @@ class _PartPathState extends State<PartPath> with InitOnceMixin {
         content = Dir.scrollable(title: widget.title, paths: widget.paths);
       }
 
-      content = Material(elevation: 10, color: Colors.white, child: content);
+      content = Material(
+        elevation: 10,
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+        child: content,
+      );
+
+      content = Listener(
+        onPointerDown: (_) {
+          _ignore = true;
+        },
+        onPointerCancel: (_) {
+          _ignore = false;
+        },
+        onPointerUp: (_) {
+          _ignore = false;
+        },
+        child: content,
+      );
 
       content = MouseRegion(
         onEnter: (_) {
@@ -309,8 +326,6 @@ class Dir extends StatefulWidget {
 
   final bool isScrollable;
 
-  String get currentPath => paths.join('');
-
   @override
   State<Dir> createState() => _DirState();
 }
@@ -338,7 +353,7 @@ class _DirState extends State<Dir> with SingleTickerProviderStateMixin {
 
   bool _init = false;
   void _updateDisplay() {
-    final newDisplay = homeProvider.state.getDisplay(widget.currentPath);
+    final newDisplay = homeProvider.state.getDisplay(widget.paths);
     if (!_init) {
       _init = true;
       newDisplay.addListener(_listener);
@@ -364,7 +379,7 @@ class _DirState extends State<Dir> with SingleTickerProviderStateMixin {
   void didUpdateWidget(covariant Dir oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!const DeepCollectionEquality().equals(widget.paths, oldWidget.paths)) {
-      homeProvider.state.remove(oldWidget.currentPath);
+      homeProvider.state.remove(oldWidget.paths);
       _updateDisplay();
     }
   }
@@ -387,7 +402,7 @@ class _DirState extends State<Dir> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     const displayStyle = TextStyle(color: Colors.blue, fontSize: 14.0);
     return Cs(() {
-      final items = homeProvider.getItems(widget.currentPath);
+      final items = homeProvider.getItems(widget.paths);
       final style =
           homeProvider.inSelectedTree(widget.paths) ? displayStyle : null;
       Widget top = BaseButton(

@@ -7,14 +7,14 @@ class HomeState {
 
   final currentPath = EqWrap(const <String>[]).cs;
 
-  final _dirDisplays = <String, AutoListenNotifier<bool>>{};
+  final _dirDisplays = <EqWrap, AutoListenNotifier<bool>>{};
 
-  AutoListenNotifier<bool> getDisplay(String item) {
-    return _dirDisplays.putIfAbsent(item, () => false.cs);
+  AutoListenNotifier<bool> getDisplay(List<String> path) {
+    return _dirDisplays.putIfAbsent(EqWrap(path), () => false.cs);
   }
 
-  void remove(String item) {
-    _dirDisplays.remove(item);
+  void remove(List<String> path) {
+    _dirDisplays.remove(EqWrap(path));
   }
 
   void resetDisplayState() {
@@ -25,7 +25,7 @@ class HomeState {
     final paths = currentPath.value.value;
     int count = 0;
     while (count <= paths.length) {
-      final path = paths.sublist(0, count).join('');
+      final path = paths.sublist(0, count);
       final notifier = getDisplay(path);
 
       notifier.value = true;

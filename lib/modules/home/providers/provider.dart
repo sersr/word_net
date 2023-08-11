@@ -35,7 +35,7 @@ class HomeProvider with NopLifecycle {
       }
 
       for (var MapEntry(:String key, :Map value) in map.entries) {
-        await _autoGen(value, key, box, fileBox);
+        await _autoGen(value, [key], box, fileBox);
       }
       await box.put('indexs', list);
     }
@@ -50,21 +50,23 @@ class HomeProvider with NopLifecycle {
     }
   }
 
-  Future<void> _autoGen(Map map, String prefix, Box box, Box file) async {
+  Future<void> _autoGen(Map map, List<String> prefix, Box box, Box file) async {
     final keys =
         map.keys.map((e) => '$e'.replaceAll(RegExp('.md\$'), '')).toList();
     keys.sort();
 
-    await box.put(prefix, keys);
+    await box.put(prefix.join(), keys);
 
     for (var MapEntry(:String key, :value) in map.entries) {
       key = key.replaceAll(RegExp('.md\$'), '');
 
       if (value is Map) {
-        final childPrefix = '$prefix$key';
-        await _autoGen(value, childPrefix, box, file);
+        await _autoGen(value, [...prefix, key], box, file);
       } else if (value is String) {
-        await file.put(key, value);
+        await file.put(key, {
+          'path': prefix,
+          'data': value,
+        });
       }
     }
   }
@@ -82,16 +84,32 @@ class HomeProvider with NopLifecycle {
     return value.get(item) != null;
   }
 
-  List<String> getItems(String item) {
+  List<String> getItems(List<String> path) {
     final value = _boxNotifier.value;
     if (value == null) return const [];
-    return value.get(item, defaultValue: const <String>[]);
+    return value.get(path.join(), defaultValue: const <String>[]);
   }
 
   String getData(String item) {
     final value = _boxFileNotifier.value;
     if (value == null) return '';
-    return value.get(item, defaultValue: '');
+    final map = value.get(item, defaultValue: const {});
+    if (map case {'data': String data}) {
+      return data;
+    } else if (map is String) {
+      return map;
+    }
+    return '';
+  }
+
+  List<String> getFiles(String target) {
+    final value = _boxFileNotifier.value;
+    if (value == null) return const [];
+    final list = value.keys.where((e) {
+      if (e is! String) return false;
+      return e.contains(target);
+    });
+    return List.from(list);
   }
 
   bool ignore = false;
@@ -103,6 +121,20 @@ class HomeProvider with NopLifecycle {
     });
   }
 
+  void onSearchTap(String file) {
+    final value = _boxFileNotifier.value;
+    if (value == null) return;
+
+    final map = value.get(file, defaultValue: const {});
+
+    if (map case {'path': List<String> path}) {
+      updatePath(path);
+      state.updatePaths();
+      ignore = false;
+      state.currentSelected.value = file;
+    }
+  }
+
   void jump(String item) {
     ignore = false;
     state.currentSelected.value = item;
@@ -111,7 +143,7 @@ class HomeProvider with NopLifecycle {
     List<String> loop(List<String> path, List<String> items) {
       for (var dirOrFile in items) {
         final newPath = [...path, dirOrFile];
-        final childItems = getItems(newPath.join());
+        final childItems = getItems(newPath);
         if (childItems.isNotEmpty) {
           final list = loop(newPath, childItems);
           if (list.isNotEmpty) {
@@ -130,7 +162,7 @@ class HomeProvider with NopLifecycle {
     var newPaths = const <String>[];
 
     for (var index in localIndex) {
-      newPaths = loop([index], getItems(index));
+      newPaths = loop([index], getItems([index]));
       if (newPaths.isNotEmpty) {
         break;
       }
