@@ -407,7 +407,7 @@ class _DirState extends State<Dir> with SingleTickerProviderStateMixin {
           homeProvider.inSelectedTree(widget.paths) ? displayStyle : null;
       Widget top = BaseButton(
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.only(top: 8.0, left: 8.0, bottom: 8.0),
           child: Container(
             alignment: Alignment.centerLeft,
             child: Text(widget.title, style: style),
@@ -447,6 +447,7 @@ class _DirState extends State<Dir> with SingleTickerProviderStateMixin {
       Widget body = Padding(
         padding: const EdgeInsets.only(left: 16),
         child: ListView.builder(
+          padding: EdgeInsets.zero,
           shrinkWrap: true,
           physics:
               widget.isScrollable ? null : const NeverScrollableScrollPhysics(),

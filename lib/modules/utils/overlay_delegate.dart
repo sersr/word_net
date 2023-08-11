@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_nop/flutter_nop.dart';
+import 'package:nop/utils.dart';
 
 import '../../_router/routes.dart';
 
@@ -11,6 +12,8 @@ OverlayMixinDelegate<OverlayMixin>? getDelegate(
     (context) {
       final data = MediaQuery.of(context);
       final size = data.size;
+
+      final paddingTop = data.padding.top;
 
       Widget child = GestureDetector(
         onTap: () {},
@@ -46,6 +49,8 @@ OverlayMixinDelegate<OverlayMixin>? getDelegate(
         bottom = size.height - dy;
         top = 20;
       }
+
+      top = top.maxThan(paddingTop);
 
       child = Container(
         alignment: alignment,

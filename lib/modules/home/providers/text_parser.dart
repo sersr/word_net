@@ -210,7 +210,7 @@ class TextParser {
           });
         }
 
-        void onEnter(PointerEnterEvent event) {
+        void onEnter() {
           if (content == null) {
             final data = getData!(value);
             if (data.isEmpty) return;
@@ -249,13 +249,25 @@ class TextParser {
               },
               child: content,
             );
+
+            content = GestureDetector(
+              onDoubleTap: () {
+                if (onTap != null) {
+                  currentDelegate?.close();
+                  currentDelegate = null;
+                  delegate = null;
+                  onTap!(value);
+                }
+              },
+              child: content,
+            );
           }
 
           cancelTimer?.cancel();
 
           if (currentDelegate == null || currentDelegate?.closed == true) {
             final text = getText?.call();
-            var offset = event.position;
+            var offset = Offset.zero;
             var height = 0.0;
             var width = 0.0;
             if (text != null) {
@@ -294,7 +306,7 @@ class TextParser {
         bool scheduled = false;
 
         bool ignore = false;
-        void loopEnter(PointerEnterEvent event) {
+        void loopEnter() {
           final enabled = showEnabledFn?.call() ?? true;
 
           enter = true;
@@ -306,31 +318,47 @@ class TextParser {
               if (!enter) return;
               scheduled = false;
               if (ignore) return;
-              loopEnter(event);
+              loopEnter();
             });
             scheduled = true;
             return;
           }
           ignore = true;
-          onEnter(event);
+          onEnter();
         }
 
-        final textSpan = TextSpan(
-          text: value,
-          style: style,
-          mouseCursor: SystemMouseCursors.click,
-          onEnter: loopEnter,
-          onExit: (p) => onExit(),
-          recognizer: TapGestureRecognizer()
-            ..onTap = () {
-              if (onTap != null) {
-                currentDelegate?.close();
-                currentDelegate = null;
-                delegate = null;
-                onTap!(value);
-              }
-            },
-        );
+        final mouseIsConnected =
+            WidgetsBinding.instance.mouseTracker.mouseIsConnected;
+
+        final TextSpan textSpan;
+        if (mouseIsConnected) {
+          textSpan = TextSpan(
+            text: value,
+            style: style,
+            mouseCursor: SystemMouseCursors.click,
+            onEnter: (_) => loopEnter(),
+            onExit: (p) => onExit(),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () {
+                if (onTap != null) {
+                  currentDelegate?.close();
+                  currentDelegate = null;
+                  delegate = null;
+                  onTap!(value);
+                }
+              },
+          );
+        } else {
+          textSpan = TextSpan(
+            text: value,
+            style: style,
+            mouseCursor: SystemMouseCursors.click,
+            recognizer: TapGestureRecognizer()
+              ..onTap = () {
+                loopEnter();
+              },
+          );
+        }
 
         children.add(textSpan);
       }

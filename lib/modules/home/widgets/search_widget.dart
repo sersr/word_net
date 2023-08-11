@@ -115,6 +115,9 @@ class _SearchWidgetState extends State<SearchWidget>
               onTap: () {
                 homeProvider.onSearchTap(item);
                 delegate?.close();
+                if (mounted) {
+                  focusNode.unfocus();
+                }
               },
               child: Container(
                 padding:
@@ -253,8 +256,11 @@ class _SearchWidgetState extends State<SearchWidget>
       child: content,
     );
 
-    return SizedBox(
+    final paddingTop = MediaQuery.of(context).padding.top;
+
+    return Container(
       height: 60,
+      margin: EdgeInsets.only(top: paddingTop),
       child: Row(
         children: [logo, Expanded(child: content)],
       ),

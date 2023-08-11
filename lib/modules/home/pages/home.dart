@@ -55,7 +55,10 @@ class _HomePageState extends State<HomePage> {
 
       Widget divider = const MouseRegion(
         cursor: SystemMouseCursors.resizeColumn,
-        child: VerticalDivider(width: 2, thickness: 2),
+        child: Padding(
+          padding: EdgeInsets.only(left: 8),
+          child: VerticalDivider(width: 2, thickness: 2),
+        ),
       );
 
       divider = GestureDetector(
@@ -74,6 +77,7 @@ class _HomePageState extends State<HomePage> {
     });
 
     child = Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -83,6 +87,19 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
+    TextField;
+
+    child = Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) {
+          final scope = FocusScope.of(context);
+          if (scope.hasFocus) {
+            scope.unfocus();
+          }
+          // SystemChannels.textInput.invokeMethod('TextInput.hide');
+          provider.parser.delegate?.close();
+        },
+        child: child);
 
     return child;
     // return Stack(
@@ -108,6 +125,6 @@ class _HomePageState extends State<HomePage> {
     final max = size.width - 100;
     _rawOffset = _rawOffset + delta;
     _rawOffset = _rawOffset.minThan(max);
-    barWidth.value = _rawOffset.maxThan(100);
+    barWidth.value = _rawOffset.maxThan(40);
   }
 }
